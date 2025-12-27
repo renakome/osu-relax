@@ -15,10 +15,10 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v4
 
-    - name: Setup .NET (ajuste a versão se necessário)
+    - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: '8.0.x' # ajuste conforme necessário
 
     - name: Install .NET Android workload
       run: |
@@ -36,7 +36,7 @@ jobs:
       id: find_apks
       run: |
         set -e
-        # procura apk(s) na pasta bin/Release (ajuste o padrão se necessário)
+        # procura apks comuns na pasta bin/Release (ajuste se seu output muda)
         apks=$(find . -type f -path "*/bin/Release/*/*.apk" -o -path "*/bin/Release/**/*.apk" || true)
         if [ -z "$apks" ]; then
           echo "No APKs found in bin/Release. Listing tree for debug:"
@@ -44,14 +44,13 @@ jobs:
           exit 1
         fi
         echo "$apks"
-        # escreve no output para uso posterior
         echo "apk_files<<EOF" >> $GITHUB_OUTPUT
         echo "$apks" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Prepare debug keystore
       run: |
-        # Se você definiu a secret DEBUG_KEYSTORE_BASE64, usa ela (recomendado para manter a mesma chave).
+        # Usa secret DEBUG_KEYSTORE_BASE64 se existir (recomendado para chave persistente)
         if [ -n "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" ]; then
           echo "Using provided DEBUG_KEYSTORE_BASE64 secret..."
           echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
@@ -69,7 +68,7 @@ jobs:
     - name: Download uber-apk-signer
       run: |
         wget -q https://github.com/patrickfav/uber-apk-signer/releases/download/v1.2.1/uber-apk-signer-1.2.1.jar -O uber-apk-signer.jar
-        java -version
+        java -version || true
 
     - name: Sign APK(s) with debug keystore
       run: |
@@ -81,6 +80,7 @@ jobs:
             --ks-pass pass:android --key-pass pass:android \
             --allowResign
         done
+      shell: bash
 
     - name: Collect signed APKs
       id: collect_signed
@@ -104,7 +104,6 @@ jobs:
         body: Automated Android build (signed debug) from Actions.
         draft: false
         prerelease: true
-        # O campo files aceita globs. Ajuste se quiser outro padrão.
         files: |
           **/signed/*.apk
           **/*aligned.apk
