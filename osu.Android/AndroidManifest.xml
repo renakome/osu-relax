@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="sh.ppy.osulazer" android:installLocation="auto" android:versionCode="$(ApplicationVersion)" android:versionName="$(Version)">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="sh.ppy.osulazer" android:installLocation="auto" android:versionCode="202512281941" android:versionName="25.12.28.1941">
 	<uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
 	<application android:allowBackup="true"
 				 android:supportsRtl="true"
