@@ -1,206 +1,181 @@
-{% extends "base.html" %}
+name: Build Android (signed debug) and Release
 
-{% block title %}{{ beatmap.artist }} - {{ beatmap.title }} [{{ beatmap.version }}] | osu!droid{% endblock %}
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
-{% block content %}
-<div class="container mx-auto px-4 py-8">
-    <!-- Beatmap Header -->
-    <div class="card bg-base-200 shadow-xl mb-6">
-        <div class="card-body">
-            <div class="flex flex-col lg:flex-row gap-6">
-                <!-- Beatmap Info -->
-                <div class="flex-1">
-                    <div class="flex items-start gap-4 mb-4">
-                        <div class="avatar">
-                            <div class="w-16 h-16 rounded-lg bg-base-300 flex items-center justify-center">
-                                <span class="text-2xl">{{ beatmap.mode|default('osu') }}</span>
-                            </div>
-                        </div>
-                        <div class="flex-1">
-                            <h1 class="text-2xl font-bold text-primary mb-1">
-                                {{ beatmap.artist }} - {{ beatmap.title }}
-                            </h1>
-                            <p class="text-lg opacity-80 mb-2">
-                                [{{ beatmap.version }}] mapped by {{ beatmap.creator }}
-                            </p>
-                            <div class="flex flex-wrap gap-2">
-                                {% if beatmap.status == 2 %}
-                                    <span class="badge badge-success">Ranked</span>
-                                {% elif beatmap.status == 3 %}
-                                    <span class="badge badge-info">Approved</span>
-                                {% elif beatmap.status == 4 %}
-                                    <span class="badge badge-warning">Qualified</span>
-                                {% else %}
-                                    <span class="badge badge-neutral">Unranked</span>
-                                {% endif %}
-                                <span class="badge badge-outline">{{ beatmap.mode|default('osu') }}</span>
-                            </div>
-                        </div>
-                    </div>
+jobs:
+  build-android:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
 
-                    <!-- Beatmap Stats -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="stat bg-base-100 rounded-box">
-                            <div class="stat-title">Stars</div>
-                            <div class="stat-value text-primary">{{ "%.2f"|format(beatmap.stars|default(0)) }}</div>
-                        </div>
-                        <div class="stat bg-base-100 rounded-box">
-                            <div class="stat-title">Length</div>
-                            <div class="stat-value">{{ "%d:%02d"|format((beatmap.length|default(0))//60, (beatmap.length|default(0))%60) }}</div>
-                        </div>
-                        <div class="stat bg-base-100 rounded-box">
-                            <div class="stat-title">BPM</div>
-                            <div class="stat-value">{{ beatmap.bpm|default(0) }}</div>
-                        </div>
-                        <div class="stat bg-base-100 rounded-box">
-                            <div class="stat-title">Max Combo</div>
-                            <div class="stat-value">{{ beatmap.max_combo|default(0) }}</div>
-                        </div>
-                    </div>
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
 
-                    <!-- Detailed Stats -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                        <div class="text-center">
-                            <div class="text-sm opacity-70">AR</div>
-                            <div class="text-lg font-semibold">{{ "%.1f"|format(beatmap.ar|default(0)) }}</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-sm opacity-70">OD</div>
-                            <div class="text-lg font-semibold">{{ "%.1f"|format(beatmap.od|default(0)) }}</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-sm opacity-70">CS</div>
-                            <div class="text-lg font-semibold">{{ "%.1f"|format(beatmap.cs|default(0)) }}</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-sm opacity-70">HP</div>
-                            <div class="text-lg font-semibold">{{ "%.1f"|format(beatmap.hp|default(0)) }}</div>
-                        </div>
-                    </div>
-                </div>
+    - name: Setup JDK 11
+      uses: actions/setup-java@v4
+      with:
+        distribution: microsoft
+        java-version: 11
 
-                <!-- Beatmap Stats Sidebar -->
-                <div class="lg:w-64">
-                    <div class="stats stats-vertical bg-base-100 shadow">
-                        <div class="stat">
-                            <div class="stat-title">Playcount</div>
-                            <div class="stat-value text-secondary">{{ beatmap.playcount|default(0)|number_format }}</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-title">Passcount</div>
-                            <div class="stat-value text-accent">{{ beatmap.passcount|default(0)|number_format }}</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-title">Beatmap ID</div>
-                            <div class="stat-value text-xs">{{ beatmap.id }}</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-title">MD5</div>
-                            <div class="stat-value text-xs font-mono">{{ beatmap.md5[:16] }}...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: "8.0.x"
 
-    <!-- Leaderboard -->
-    <div class="card bg-base-200 shadow-xl">
-        <div class="card-body">
-            <h3 class="card-title text-xl mb-4">
-                🏆 Leaderboard
-                <span class="badge badge-primary">{{ total_scores }} scores</span>
-            </h3>
+    - name: Install .NET Android workload
+      run: dotnet workload install android
 
-            <div class="overflow-x-auto">
-                <table class="table table-zebra w-full">
-                    <thead>
-                        <tr>
-                            <th class="w-16">#</th>
-                            <th>Player</th>
-                            <th class="text-center">Score</th>
-                            <th class="text-center">Accuracy</th>
-                            <th class="text-center">Combo</th>
-                            <th class="text-center">PP</th>
-                            <th class="text-center">Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for score in scores %}
-                        <tr class="hover">
-                            <td class="font-bold">
-                                {% if score.rank == 1 %}
-                                    <span class="text-yellow-500">🥇</span>
-                                {% elif score.rank == 2 %}
-                                    <span class="text-gray-400">🥈</span>
-                                {% elif score.rank == 3 %}
-                                    <span class="text-amber-600">🥉</span>
-                                {% else %}
-                                    #{{ score.rank }}
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="flex items-center gap-2">
-                                    <img src="https://flagsapi.com/{{ score.country|default('XX') }}/flat/32.png"
-                                         alt="{{ score.country }}"
-                                         class="w-5 h-4 rounded"
-                                         onerror="this.style.display='none'">
-                                    <a href="/user/profile.php?id={{ score.user_id|default(0) }}"
-                                       class="link link-hover font-medium">
-                                        {{ score.username }}
-                                    </a>
-                                </div>
-                            </td>
-                            <td class="text-center font-mono">{{ score.score }}</td>
-                            <td class="text-center">
-                                <span class="{% if score.accuracy|float > 95 %}text-success{% elif score.accuracy|float > 90 %}text-warning{% else %}text-error{% endif %}">
-                                    {{ score.accuracy }}
-                                </span>
-                            </td>
-                            <td class="text-center">{{ score.max_combo }}x</td>
-                            <td class="text-center">
-                                {% if score.pp %}
-                                    {{ "%.1f"|format(score.pp) }}pp
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td class="text-center text-xs opacity-70">
-                                <script>document.write(formatUnixTimestamp({{ score.date }}))</script>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    - name: Restore
+      run: dotnet restore osu.Android.slnf
 
-            {% if total_scores == 0 %}
-            <div class="text-center py-8">
-                <div class="text-6xl mb-4">🏆</div>
-                <p class="text-lg opacity-70">No scores yet!</p>
-                <p class="text-sm opacity-50">Be the first to set a score on this beatmap.</p>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
+    - name: Build Release (Android)
+      run: dotnet build -c Release osu.Android.slnf
 
-<script>
-function formatUnixTimestamp(ts) {
-    const date = new Date(ts * 1000);
-    const now = new Date();
-    const diff = now - date;
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    - name: Find produced APK(s)
+      id: find_apks
+      shell: pwsh
+      run: |
+        # Try multiple possible APK locations
+        $apkPatterns = @(
+          "**/bin/Release/**/*.apk",
+          "**/bin/**/*.apk"
+        )
 
-    if (days === 0) {
-        return date.toLocaleTimeString();
-    } else if (days === 1) {
-        return 'Yesterday';
-    } else if (days < 7) {
-        return `${days} days ago`;
-    } else {
-        return date.toLocaleDateString();
-    }
-}
-</script>
-{% endblock %}
+        $apks = @()
+        foreach ($pattern in $apkPatterns) {
+          try {
+            $found = Get-ChildItem -Path $pattern -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -eq '.apk' }
+            if ($found -and $found.Count -gt 0) {
+              $apks += $found
+              Write-Host "Found $($found.Count) APK(s) with pattern '$pattern'"
+            }
+          } catch {
+            Write-Host "Error with pattern '$pattern': $_"
+          }
+        }
+
+        # Remove duplicates and filter to actual APK files
+        $apks = $apks | Sort-Object -Property FullName -Unique | Where-Object { $_.Extension -eq '.apk' }
+
+        if (-not $apks -or $apks.Count -eq 0) {
+          Write-Host "No APKs found. Listing all directories with 'Release' in path for debug:"
+          Get-ChildItem -Recurse -Directory | Where-Object { $_.FullName -like "*Release*" } | Select-Object -First 10
+
+          Write-Host "Listing all APK files in workspace:"
+          Get-ChildItem -Path "*.apk" -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 20
+
+          exit 1
+        }
+
+        $apkPaths = $apks | Select-Object -ExpandProperty FullName
+        Write-Host "Found $($apks.Count) APK(s) total:"
+        $apkPaths | ForEach-Object { Write-Host "  $_" }
+
+        "apk_files<<EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        $apkPaths | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+    - name: Prepare debug keystore
+      run: |
+        # Usa secret DEBUG_KEYSTORE_BASE64 se existir (recomendado para chave persistente)
+        if [ -n "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" ]; then
+          echo "Using provided DEBUG_KEYSTORE_BASE64 secret..."
+          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
+        else
+          echo "No DEBUG_KEYSTORE_BASE64 secret found — generating debug.keystore on-the-fly..."
+          keytool -genkeypair -v \
+            -keystore debug.keystore \
+            -storepass android -keypass android \
+            -alias androiddebugkey \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -keyalg RSA -keysize 2048 -validity 10000
+        fi
+        ls -lah debug.keystore
+
+    - name: Download uber-apk-signer
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/patrickfav/uber-apk-signer/releases/download/v1.2.1/uber-apk-signer-1.2.1.jar" -OutFile "uber-apk-signer.jar"
+        java -version
+
+    - name: Sign APK(s) with debug keystore
+      shell: pwsh
+      run: |
+        $apkFiles = "${{ steps.find_apks.outputs.apk_files }}".Split("`n")
+        foreach ($apk in $apkFiles) {
+          if (-not [string]::IsNullOrWhiteSpace($apk)) {
+            Write-Host "Signing: $apk"
+            & java -jar uber-apk-signer.jar --apks "$apk" --ks debug.keystore --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --allowResign
+          }
+        }
+
+    - name: Collect signed APKs
+      id: collect_signed
+      shell: pwsh
+      run: |
+        # Look for signed APKs (aligned.apk files created by uber-apk-signer)
+        $signedPatterns = @(
+          "**/*aligned.apk",
+          "**/*-Signed.apk",
+          "**/signed/**/*.apk"
+        )
+
+        $signed = @()
+        foreach ($pattern in $signedPatterns) {
+          try {
+            $found = Get-ChildItem -Path $pattern -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -eq '.apk' }
+            if ($found -and $found.Count -gt 0) {
+              $signed += $found
+              Write-Host "Found $($found.Count) signed APK(s) with pattern '$pattern'"
+            }
+          } catch {
+            Write-Host "Error with pattern '$pattern': $_"
+          }
+        }
+
+        # Remove duplicates and filter to actual APK files
+        $signed = $signed | Sort-Object -Property FullName -Unique | Where-Object { $_.Extension -eq '.apk' }
+
+        if (-not $signed -or $signed.Count -eq 0) {
+          Write-Host "No signed APKs found. Listing all APK files for debug:"
+          Get-ChildItem -Path "*.apk" -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 20
+          exit 1
+        }
+
+        $signedPaths = $signed | Select-Object -ExpandProperty FullName
+        Write-Host "Found $($signed.Count) signed APK(s) total:"
+        $signedPaths | ForEach-Object { Write-Host "  $_" }
+
+        "signed_apks<<EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        $signedPaths | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+    - name: Create GitHub Release and upload signed APK(s)
+      uses: ncipollo/release-action@v1
+      with:
+        tag: android-build-${{ github.run_number }}-r${{ github.run_id }}
+        name: Android build ${{ github.run_number }} (run ${{ github.run_id }})
+        body: Automated Android build (signed debug) from Actions.
+        draft: false
+        prerelease: true
+        artifacts: "**/signed/*.apk,**/*aligned.apk"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Final cleanup
+      if: always()
+      shell: pwsh
+      run: |
+        Write-Host "Final cleanup"
+
+        # Remove debug keystore and signing tools
+        Remove-Item -Path "debug.keystore", "uber-apk-signer.jar" -ErrorAction SilentlyContinue
+
+        # Remove any remaining build artifacts
+        Get-ChildItem -Path "*.tmp", "*.log" -Recurse -File -ErrorAction SilentlyContinue | Remove-Item -Force
+
+        Write-Host "Cleanup completed"
