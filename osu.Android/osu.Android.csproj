@@ -6,7 +6,7 @@
     <RootNamespace>osu.Android</RootNamespace>
     <AssemblyName>osu.Android</AssemblyName>
     <Version>$([System.DateTime]::Now.ToString("yy.MM.dd.HHmm"))</Version>
-    <ApplicationVersion>$([System.DateTime]::Now.ToString("yyyyMMddHHmm"))</ApplicationVersion>
+    <ApplicationVersion>202512281930</ApplicationVersion>
     <ApplicationDisplayVersion Condition=" '$(ApplicationDisplayVersion)' == '' ">$(Version)</ApplicationDisplayVersion>
   </PropertyGroup>
   <ItemGroup>
