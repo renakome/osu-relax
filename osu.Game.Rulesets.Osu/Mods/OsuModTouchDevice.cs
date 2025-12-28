@@ -21,8 +21,8 @@ namespace osu.Game.Rulesets.Osu.Mods
         public override Type[] IncompatibleMods =>
             base.IncompatibleMods.Concat(new[] { typeof(OsuModAutopilot), typeof(OsuModBloom) }).ToArray();
 
-        // Keep ranked behaviour as before (default behaviour).
-        public override bool Ranked => UsesDefaultConfiguration;
+        // Mod sempre válido para submissão em dispositivos móveis (como no osu!droid)
+        public override bool Ranked => true;
 
         /// <summary>
         /// When this mod is applied to a drawable ruleset, attach the pinch-to-zoom handler to the playfield adjustment container.
