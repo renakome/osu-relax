@@ -9,13 +9,14 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.Osu.UI;
 using osu.Game.Rulesets.Osu.Objects;
+using osu.Game.Beatmaps;
 
 namespace osu.Game.Rulesets.Osu.Mods
 {
     /// <summary>
     /// osu! specific Touch device mod. Attaches pinch-to-zoom handling to the drawable ruleset's playfield when applied.
     /// </summary>
-    public class OsuModTouchDevice : ModTouchDevice, IApplicableToDrawableRuleset<OsuHitObject>
+    public class OsuModTouchDevice : ModTouchDevice, IApplicableToDrawableRuleset<OsuHitObject>, IApplicableToDifficulty
     {
         public override Type[] IncompatibleMods =>
             base.IncompatibleMods.Concat(new[] { typeof(OsuModAutopilot), typeof(OsuModBloom) }).ToArray();
@@ -24,13 +25,20 @@ namespace osu.Game.Rulesets.Osu.Mods
         public override bool Ranked => true;
 
         /// <summary>
-        /// ModTouchDevice para dispositivos móveis - apenas ativa pinch-to-zoom.
-        /// Não modifica a dificuldade do beatmap para preservar o ranking correto.
+        /// ModTouchDevice para dispositivos móveis - aumenta tamanho dos hit circles.
+        /// Modifica CircleSize para fazer círculos aparecerem maiores em telas pequenas.
         /// </summary>
-        /// <remarks>
-        /// O scaling visual pode ser implementado de outras formas no futuro
-        /// sem afetar as estatísticas de dificuldade.
-        /// </remarks>
+        public void ApplyToDifficulty(BeatmapDifficulty difficulty)
+        {
+            // Redução agressiva do CircleSize para aumentar significativamente o tamanho dos círculos
+            // CS 4 -> CS 1.2 (círculos ~3x maiores visualmente)
+            float baseReduction = 2.8f;
+
+            // Ajuste adicional baseado no CS original
+            float csAdjustment = difficulty.CircleSize > 4 ? 0.7f : 0f;
+
+            difficulty.CircleSize = Math.Max(0.5f, difficulty.CircleSize - (baseReduction + csAdjustment));
+        }
 
         /// <summary>
         /// When this mod is applied to a drawable ruleset, attach the pinch-to-zoom handler to the playfield adjustment container.
