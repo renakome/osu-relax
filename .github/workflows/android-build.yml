@@ -31,138 +31,49 @@ jobs:
       run: dotnet workload install android
 
     - name: Restore
-      run: dotnet restore osu.Android.slnf
+      run: dotnet restore osu.Android\osu.Android.csproj
 
     - name: Build Release (Android)
-      run: dotnet build -c Release osu.Android.slnf
+      run: dotnet build osu.Android\osu.Android.csproj -c Release
 
-    - name: Find produced APK(s)
+    - name: Find main APK
       id: find_apks
       shell: pwsh
       run: |
-        Write-Host "Searching for APK files..."
+        Write-Host "Looking for main osu! lazer APK..."
 
-        # First, find all APK files in the workspace
-        $allApks = Get-ChildItem -Path "*.apk" -Recurse -File -ErrorAction SilentlyContinue
+        # Look specifically for the main APK in the expected location
+        $mainApkPath = "osu.Android\bin\Release\net8.0-android\sh.ppy.osulazer.apk"
 
-        if (-not $allApks -or $allApks.Count -eq 0) {
-          Write-Host "No APK files found anywhere in workspace"
-          exit 1
-        }
+        if (Test-Path $mainApkPath) {
+          Write-Host "Found main APK: $mainApkPath"
+          $apkPaths = @($mainApkPath)
+        } else {
+          Write-Host "Main APK not found at expected location: $mainApkPath"
+          Write-Host "Searching for any sh.ppy.osulazer.apk files..."
+          $foundApks = Get-ChildItem -Path "*sh.ppy.osulazer.apk" -Recurse -File -ErrorAction SilentlyContinue
 
-        Write-Host "Found $($allApks.Count) APK files total"
-
-        # Filter to only unsigned APKs (exclude already signed ones)
-        $unsignedApks = $allApks | Where-Object {
-          $_.Name -notlike "*-Signed.apk" -and
-          $_.Name -notlike "*aligned.apk" -and
-          $_.FullName -like "*bin*"  # Only from bin directories
-        }
-
-        if (-not $unsignedApks -or $unsignedApks.Count -eq 0) {
-          Write-Host "No unsigned APK files found in bin directories"
-          Write-Host "All found APKs:"
-          $allApks | ForEach-Object { Write-Host "  $($_.FullName)" }
-          exit 1
-        }
-
-        $apkPaths = $unsignedApks | Select-Object -ExpandProperty FullName | Sort-Object
-        Write-Host "Found $($unsignedApks.Count) unsigned APK(s) to sign:"
-        $apkPaths | ForEach-Object { Write-Host "  $_" }
-
-        "apk_files<<EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-        $apkPaths | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-        "EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-
-    - name: Prepare debug keystore
-      run: |
-        # Usa secret DEBUG_KEYSTORE_BASE64 se existir (recomendado para chave persistente)
-        if [ -n "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" ]; then
-          echo "Using provided DEBUG_KEYSTORE_BASE64 secret..."
-          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
-        else
-          echo "No DEBUG_KEYSTORE_BASE64 secret found — generating debug.keystore on-the-fly..."
-          keytool -genkeypair -v \
-            -keystore debug.keystore \
-            -storepass android -keypass android \
-            -alias androiddebugkey \
-            -dname "CN=Android Debug,O=Android,C=US" \
-            -keyalg RSA -keysize 2048 -validity 10000
-        fi
-        ls -lah debug.keystore
-
-    - name: Download uber-apk-signer
-      run: |
-        Invoke-WebRequest -Uri "https://github.com/patrickfav/uber-apk-signer/releases/download/v1.2.1/uber-apk-signer-1.2.1.jar" -OutFile "uber-apk-signer.jar"
-        java -version
-
-    - name: Sign APK(s) with debug keystore
-      shell: pwsh
-      run: |
-        $apkFiles = "${{ steps.find_apks.outputs.apk_files }}".Split("`n")
-        foreach ($apk in $apkFiles) {
-          if (-not [string]::IsNullOrWhiteSpace($apk)) {
-            Write-Host "Signing: $apk"
-            & java -jar uber-apk-signer.jar --apks "$apk" --ks debug.keystore --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --allowResign
+          if ($foundApks -and $foundApks.Count -gt 0) {
+            $apkPaths = $foundApks | Where-Object { $_.Name -eq "sh.ppy.osulazer.apk" } | Select-Object -ExpandProperty FullName
+            Write-Host "Found main APK(s):"
+            $apkPaths | ForEach-Object { Write-Host "  $_" }
+          } else {
+            Write-Host "No sh.ppy.osulazer.apk found. Listing all APK files for debug:"
+            Get-ChildItem -Path "*.apk" -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 10 | ForEach-Object { Write-Host "  $($_.FullName)" }
+            exit 1
           }
         }
 
-    - name: Collect signed APKs
-      id: collect_signed
-      shell: pwsh
-      run: |
-        Write-Host "Looking for signed APK files..."
+        "apk_path=$($apkPaths[0])" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-        # Find all APK files
-        $allApks = Get-ChildItem -Path "*.apk" -Recurse -File -ErrorAction SilentlyContinue
-
-        if (-not $allApks -or $allApks.Count -eq 0) {
-          Write-Host "No APK files found at all"
-          exit 1
-        }
-
-        # Filter to only signed APKs (aligned.apk or *-Signed.apk files)
-        $signedApks = $allApks | Where-Object {
-          $_.Name -like "*aligned.apk" -or $_.Name -like "*-Signed.apk"
-        }
-
-        if (-not $signedApks -or $signedApks.Count -eq 0) {
-          Write-Host "No signed APK files found"
-          Write-Host "All found APKs:"
-          $allApks | ForEach-Object { Write-Host "  $($_.Name)" }
-          exit 1
-        }
-
-        $signedPaths = $signedApks | Select-Object -ExpandProperty FullName | Sort-Object
-        Write-Host "Found $($signedApks.Count) signed APK(s):"
-        $signedPaths | ForEach-Object { Write-Host "  $_" }
-
-        "signed_apks<<EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-        $signedPaths | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-        "EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-
-    - name: Create GitHub Release and upload signed APK(s)
+    - name: Create GitHub Release and upload APK
       uses: ncipollo/release-action@v1
       with:
         tag: android-build-${{ github.run_number }}-r${{ github.run_id }}
         name: Android build ${{ github.run_number }} (run ${{ github.run_id }})
-        body: Automated Android build (signed debug) from Actions.
+        body: Automated Android build from Actions.
         draft: false
         prerelease: true
-        artifacts: "**/signed/*.apk,**/*aligned.apk"
+        artifacts: ${{ steps.find_apks.outputs.apk_path }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Final cleanup
-      if: always()
-      shell: pwsh
-      run: |
-        Write-Host "Final cleanup"
-
-        # Remove debug keystore and signing tools
-        Remove-Item -Path "debug.keystore", "uber-apk-signer.jar" -ErrorAction SilentlyContinue
-
-        # Remove any remaining build artifacts
-        Get-ChildItem -Path "*.tmp", "*.log" -Recurse -File -ErrorAction SilentlyContinue | Remove-Item -Force
-
-        Write-Host "Cleanup completed"
