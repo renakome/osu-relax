@@ -117,6 +117,11 @@ namespace osu.Game
         private const double general_log_debounce = 60000;
         private const string tablet_log_prefix = @"[Tablet] ";
 
+        /// <summary>
+        /// Override para usar configuração do osu!droid server
+        /// </summary>
+        public override EndpointConfiguration CreateEndpoints() => new OsuDroidEndpointConfiguration();
+
         public Toolbar Toolbar { get; private set; }
 
         private ChatOverlay chatOverlay;
