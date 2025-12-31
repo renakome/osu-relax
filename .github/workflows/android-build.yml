@@ -111,72 +111,19 @@ jobs:
 
         "apk_path=$($apkPaths[0])" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-    - name: Prepare keystore
+    - name: Prepare debug keystore (always use debug.jks)
       shell: pwsh
       run: |
-        # Use release keystore from secrets if available, else generate debug keystore
-        $keystoreB64 = "${{ secrets.KEYSTORE_BASE64 }}"
-        $keystorePassword = "${{ secrets.KEYSTORE_PASSWORD }}"
-        $keyAlias = "${{ secrets.KEY_ALIAS }}"
-        $keyPassword = "${{ secrets.KEY_PASSWORD }}"
+        Write-Host "Generating debug.jks (JKS) for signing..."
+        # Explicitly create a JKS keystore named debug.jks
+        keytool -genkeypair -v -keystore debug.jks -storetype JKS -storepass android -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
 
-        if ($keystoreB64) {
-          Write-Host "Using release keystore from secrets"
+        "storeFile=debug.jks" | Out-File -FilePath "keystore.properties" -Encoding ASCII
+        "storePassword=android" | Out-File -FilePath "keystore.properties" -Append -Encoding ASCII
+        "keyAlias=androiddebugkey" | Out-File -FilePath "keystore.properties" -Append -Encoding ASCII
+        "keyPassword=android" | Out-File -FilePath "keystore.properties" -Append -Encoding ASCII
 
-          # Decode base64 safely to binary
-          try {
-            [System.IO.File]::WriteAllBytes("release.keystore", [System.Convert]::FromBase64String($keystoreB64))
-            Write-Host "Decoded release.keystore (binary)"
-          } catch {
-            Write-Host "Safe base64 decode failed, falling back to certutil decode method"
-            $keystoreB64 | Out-File -FilePath "release.b64" -Encoding ASCII
-            certutil -decode "release.b64" "release.keystore" | Out-Null
-          }
-
-          # Try to list as JKS first
-          $isJks = $false
-          Write-Host "Inspecting keystore as JKS..."
-          & keytool -list -v -keystore release.keystore -storepass $keystorePassword 2>&1 | Tee-Object -Variable out1 | Out-Null
-          if ($LASTEXITCODE -eq 0) {
-            $isJks = $true
-            Write-Host "Keystore appears to be JKS"
-            $finalKeystore = "release.keystore"
-          } else {
-            Write-Host "Not JKS, trying PKCS12..."
-            & keytool -list -v -keystore release.keystore -storetype PKCS12 -storepass $keystorePassword 2>&1 | Tee-Object -Variable out2 | Out-Null
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "Keystore is PKCS12 - converting to JKS for signing tool compatibility..."
-              & keytool -importkeystore -srckeystore release.keystore -srcstoretype PKCS12 -srcstorepass $keystorePassword -destkeystore release.jks -deststoretype JKS -deststorepass $keystorePassword -destkeypass $keyPassword -noprompt
-              if ($LASTEXITCODE -ne 0) {
-                Write-Host "Failed to convert PKCS12 -> JKS. keytool output:"
-                $out2
-                exit 1
-              }
-              $finalKeystore = "release.jks"
-              Write-Host "Converted keystore to release.jks"
-            } else {
-              Write-Host "Keystore not recognized as JKS or PKCS12. keytool outputs:"
-              Write-Host $out1
-              Write-Host $out2
-              exit 1
-            }
-          }
-
-          # Create keystore.properties for uber-apk-signer
-          "storeFile=$finalKeystore" | Out-File -FilePath "keystore.properties" -Encoding ASCII
-          "storePassword=$keystorePassword" | Out-File -FilePath "keystore.properties" -Append -Encoding ASCII
-          "keyAlias=$keyAlias" | Out-File -FilePath "keystore.properties" -Append -Encoding ASCII
-          "keyPassword=$keyPassword" | Out-File -FilePath "keystore.properties" -Append -Encoding ASCII
-          Write-Host "Keystore configured: $finalKeystore"
-        } else {
-          Write-Host "No release keystore found in secrets, generating debug keystore"
-          keytool -genkeypair -v -keystore debug.keystore -storepass android -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
-          "storeFile=debug.keystore" | Out-File -FilePath "keystore.properties" -Encoding ASCII
-          "storePassword=android" | Out-File -FilePath "keystore.properties" -Append -Encoding ASCII
-          "keyAlias=androiddebugkey" | Out-File -FilePath "keystore.properties" -Append -Encoding ASCII
-          "keyPassword=android" | Out-File -FilePath "keystore.properties" -Append -Encoding ASCII
-          Write-Host "Debug keystore configured"
-        }
+        Write-Host "Debug keystore generated and keystore.properties written."
 
     - name: Download uber-apk-signer
       shell: pwsh
