@@ -161,7 +161,7 @@ jobs:
         Write-Host "Using keystore: $storeFile"
 
         # Sign the APK
-        & java -jar uber-apk-signer.jar --apks "$apkPath" --ks "$storeFile" --ks-key-alias "$keyAlias" --ks-pass "pass:$storePass" --key-pass "pass:$keyPass" --allowResign
+        & java -jar uber-apk-signer.jar --apks "$apkPath" --ks "$storeFile" --ksAlias "$keyAlias" --ksPass "pass:$storePass" --ksKeyPass "pass:$keyPass" --allowResign
 
     - name: Find signed APK
       id: find_signed
